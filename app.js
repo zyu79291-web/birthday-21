@@ -98,11 +98,15 @@ const pages = [...document.querySelectorAll('.story-page')];
 let currentPage = 0;
 let letterOpened = false;
 function updateControls() {
+  const finished = currentPage === pages.length - 1;
+  $('continueHint').hidden = finished;
+  $('continueHint').disabled = finished;
+  $('story').classList.toggle('is-finished', finished);
+  if (finished) { $('continueHint').textContent = ''; return; }
   let hint = '轻点空白处，继续看看';
   if (currentPage === 0) hint = '点一下，开启生日惊喜';
   if (currentPage === 4) hint = candlesOut ? '轻点空白处，收下生日信' : '点一下蛋糕，吹灭蜡烛';
   if (currentPage === 5) hint = letterOpened ? '轻点空白处，继续看信' : '点开信封，读读这封信';
-  if (currentPage === pages.length - 1) hint = '再看一次这份生日惊喜';
   $('continueHint').innerHTML = `${hint} <span aria-hidden="true">✧</span>`;
 }
 function goToPage(index, moveFocus = true) {
@@ -145,17 +149,10 @@ $('cakeScene').addEventListener('keydown', event => {
 });
 $('letterBtn').addEventListener('click', openLetter);
 function nextPage() {
+  if (currentPage === pages.length - 1) return;
   if (currentPage === 0) { if (musicWanted) void playMusic(); burst(100); }
   if (currentPage === 4 && !candlesOut) { toggleCandles(); return; }
   if (currentPage === 5 && !letterOpened) { openLetter(); return; }
-  if (currentPage === pages.length - 1) {
-    setCandles(false);
-    letterOpened = false;
-    $('letterIntro').hidden = false;
-    $('letterSheet').hidden = true;
-    goToPage(0);
-    return;
-  }
   goToPage(currentPage + 1);
 }
 $('continueHint').addEventListener('click', nextPage);
