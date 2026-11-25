@@ -5,7 +5,7 @@ const musicBtn = $('musicBtn');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let musicWanted = true;
 let toastTimer;
-let wishMade = false;
+let candlesOut = false;
 let currentPhoto = 0;
 let lastFocused = null;
 const photoCaptions = ['把阳光戴在头上','笑起来就很好看','海风会记得这一天','去有海的地方','今天也是可爱本人','吃到好吃的就很快乐','收集一口夏天','永远有出发的勇气','把日子过成彩色'];
@@ -53,6 +53,7 @@ $('surpriseBtn').addEventListener('click', () => {
   void playMusic();
   burst(180);
   toast('亲爱的猪油渣，21 岁生日快乐！♡');
+  goToPage(1);
 });
 function openDialog(dialog) {
   lastFocused = document.activeElement;
@@ -93,30 +94,88 @@ $('lightboxImg').addEventListener('touchend', event => {
   const delta = event.changedTouches[0].screenX - touchStartX;
   if (Math.abs(delta) > 65) showPhoto(currentPhoto + (delta < 0 ? 1 : -1));
 }, { passive:true });
-$('wishBtn').addEventListener('click', () => {
-  if (wishMade) {
-    wishMade = false;
-    $('cakeScene').classList.remove('extinguished');
-    $('wishBtn').innerHTML = '许个愿，吹蜡烛 <span aria-hidden="true">✧</span>';
-    $('wishStatus').textContent = '蜡烛又亮起来了，再许一个愿望吧。';
+const pages = [...document.querySelectorAll('.story-page')];
+let currentPage = 0;
+let letterOpened = false;
+function updateControls() {
+  let hint = '轻点空白处，继续看看';
+  if (currentPage === 0) hint = '点一下，开启生日惊喜';
+  if (currentPage === 4) hint = candlesOut ? '轻点空白处，收下生日信' : '点一下蛋糕，吹灭蜡烛';
+  if (currentPage === 5) hint = letterOpened ? '轻点空白处，继续看信' : '点开信封，读读这封信';
+  if (currentPage === pages.length - 1) hint = '再看一次这份生日惊喜';
+  $('continueHint').innerHTML = `${hint} <span aria-hidden="true">✧</span>`;
+}
+function goToPage(index, moveFocus = true) {
+  currentPage = Math.max(0, Math.min(pages.length - 1, index));
+  pages.forEach((page, i) => {
+    page.hidden = i !== currentPage;
+    page.classList.toggle('is-active', i === currentPage);
+  });
+  updateControls();
+  if (moveFocus) pages[currentPage].focus({ preventScroll:true });
+}
+function openLetter() {
+  letterOpened = true;
+  $('letterIntro').hidden = true;
+  $('letterSheet').hidden = false;
+  $('letterSheet').focus({ preventScroll:true });
+  updateControls();
+}
+function setCandles(out) {
+  candlesOut = out;
+  $('cakeScene').classList.toggle('extinguished', out);
+  $('wishBtn').textContent = out ? '再点亮蜡烛 ✧' : '吹蜡烛 ✧';
+  $('wishStatus').textContent = out ? '生日快乐！愿你的 21 岁，每一天都甜甜的。♡' : '今天的蛋糕，是给 21 岁的你。';
+  $('cakeTitle').innerHTML = out ? '21 岁的快乐，<br>现在开始！' : '生日快乐，<br>蜡烛为你点亮了。';
+  $('cakeScene').setAttribute('aria-label', out ? '轻点蛋糕，重新点亮蜡烛' : '轻点蛋糕，吹灭蜡烛');
+  updateControls();
+  document.querySelector('.cake').setAttribute('aria-label', out ? '21 岁生日蛋糕，蜡烛已经吹灭' : '一个插着点亮的 21 岁蜡烛的粉色生日蛋糕');
+}
+function toggleCandles() {
+  setCandles(!candlesOut);
+  if (candlesOut) {
+    burst(210);
+    toast('呼～生日快乐，亲爱的猪油渣！♡');
   }
-  openDialog($('wishDialog'));
+}
+$('wishBtn').addEventListener('click', toggleCandles);
+$('cakeScene').addEventListener('click', toggleCandles);
+$('cakeScene').addEventListener('keydown', event => {
+  if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCandles(); }
 });
-$('wishForm').addEventListener('submit', (event) => {
-  event.preventDefault();
-  if (musicWanted) void playMusic();
-  wishMade = true;
-  $('wishDialog').close();
-  $('cakeScene').classList.add('extinguished');
-  $('wishBtn').textContent = '再点亮一次蜡烛 ✧';
-  const wish = $('wishInput').value.trim();
-  $('wishStatus').textContent = wish ? `愿「${wish}」在新的一岁慢慢实现。♡` : '愿望已送达！愿你的 21 岁，所遇皆甜，所想皆如愿。♡';
-  // The wish stays in this page only and is never sent to a server.
-  $('wishInput').value = '';
-  burst(210);
-  toast('呼～愿你的每一个愿望，都有回响。✧');
+$('letterBtn').addEventListener('click', openLetter);
+function nextPage() {
+  if (currentPage === 0) { if (musicWanted) void playMusic(); burst(100); }
+  if (currentPage === 4 && !candlesOut) { toggleCandles(); return; }
+  if (currentPage === 5 && !letterOpened) { openLetter(); return; }
+  if (currentPage === pages.length - 1) {
+    setCandles(false);
+    letterOpened = false;
+    $('letterIntro').hidden = false;
+    $('letterSheet').hidden = true;
+    goToPage(0);
+    return;
+  }
+  goToPage(currentPage + 1);
+}
+$('continueHint').addEventListener('click', nextPage);
+$('story').addEventListener('click', event => {
+  if (event.target.closest('button,a,dialog,[role="button"]')) return;
+  if (window.getSelection()?.toString()) return;
+  nextPage();
 });
-$('letterBtn').addEventListener('click', () => openDialog($('letterDialog')));
+document.querySelectorAll('[data-page]').forEach(control => {
+  control.addEventListener('click', event => {
+    event.preventDefault();
+    goToPage(Number(control.dataset.page));
+  });
+});
+document.addEventListener('keydown', event => {
+  if (document.querySelector('dialog[open]') || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.key === 'ArrowRight' || ((event.key === ' ' || event.key === 'Enter') && !event.target.closest('button,a,[role="button"]'))) { event.preventDefault(); nextPage(); }
+  if (event.key === 'ArrowLeft') { event.preventDefault(); goToPage(currentPage - 1); }
+});
+goToPage(0, false);
 const canvas = $('confetti');
 const ctx = canvas.getContext('2d');
 let particles = [];
